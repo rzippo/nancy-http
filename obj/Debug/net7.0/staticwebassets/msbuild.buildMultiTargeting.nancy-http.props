@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\nancy-http.props" />
+</Project>
