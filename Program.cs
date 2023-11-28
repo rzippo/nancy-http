@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.Mvc;
 using Unipi.Nancy.MinPlusAlgebra;
 using Unipi.Nancy.Numerics;
 
@@ -7,63 +7,219 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.AddConsole();
 var app = builder.Build();
 
+// Curve storage "service"
 var map = new ConcurrentDictionary<int, Curve>();
 
-app.MapPost("/curve", async (HttpRequest request) =>
+string HashToId(int hash) => 
+    Convert.ToHexString(BitConverter.GetBytes(hash));
+
+int IdToHash(string id) =>
+    BitConverter.ToInt32(Convert.FromHexString(id));
+
+Curve? LoadCurve(string id)
 {
-    string json = "";
-    using (var reader = new StreamReader(request.Body))
-    {
-        json = await reader.ReadToEndAsync();
-    }
-    app.Logger.LogInformation($"Received curve: {json}");
-    var curve = Curve.FromJson(json);
-    var id = curve.GetHashCode();
-    map[id] = curve;
+    var hash = IdToHash(id);
+    if (map.TryGetValue(hash, out var curve))
+        return curve;
+    else
+        return null;
+}
+
+(List<Curve> curves, List<string> notFound) LoadCurves(string[] ids)
+{
+    var curves = ids
+        .Where(id => map.ContainsKey(IdToHash(id)))
+        .Select(id => map[IdToHash(id)])
+        .ToList();
+
+    var notFound = ids
+        .Where(id => !map.ContainsKey(IdToHash(id)))
+        .ToList();
+
+    return (curves, notFound);
+}
+
+string StoreCurve(Curve curve)
+{
+    var hash = curve.GetStableHashCode();
+    map[hash] = curve;
+    var id = HashToId(hash);
     return id;
+}
+
+// nancy-http "controller"
+
+app.MapPost("/curve", (Curve curve) =>
+{
+    var id = StoreCurve(curve);
+    return new { id = id };
 });
 
-app.MapGet("/curve/{id}", (int id) => map[id].ToString());
-
-app.MapGet("/curve/{id}/sample", (int id, [FromBody] Rational time) =>
+app.MapGet("/curve/{id}", (string id) =>
 {
-    var curve = map[id];
-    var sample = curve.ValueAt(time);
-    return sample;
+    var curve = LoadCurve(id);
+    if (curve == null)
+        return Results.NotFound();
+    else
+        return Results.Ok(new { curve = curve });
+});
+
+app.MapGet("/curve/{id}/valueAt", (string id, [FromBody] Rational time) =>
+{
+    var curve = LoadCurve(id);
+    if (curve == null)
+        return Results.NotFound();
+    else
+    {
+        var sample = curve.ValueAt(time);
+        return Results.Ok(sample);
+    }
 });
 
 app.MapDelete("/curve", (int id) => map.Remove(id, out _));
 
-app.MapPost("/curve/convolution", ([FromBody]ConvolutionOperands parameters) =>
+app.MapPost("/curve/addition", ([FromBody]string[] operands) =>
 {
-    var fCurve = map[parameters.f];
-    var gCurve = map[parameters.g];
-    var result = Curve.Convolution(fCurve, gCurve);
-    var id = result.GetHashCode();
-    map[id] = result;
-    return id;
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+    
+    var result = Curve.Addition(curves);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
 });
 
-app.MapPost("/curve/deconvolution", ([FromBody]DeconvolutionOperands parameters) =>
+app.MapPost("/curve/subtraction", ([FromBody]string[] operands) =>
 {
-    var fCurve = map[parameters.f];
-    var gCurve = map[parameters.g];
-    var result = Curve.Deconvolution(fCurve, gCurve);
-    var id = result.GetHashCode();
-    map[id] = result;
-    return id;
+    if (operands.Length != 2)
+        return Results.BadRequest("Subtraction accepts only 2 operands.");
+
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+    
+    var result = Curve.Subtraction(curves[0], curves[1]);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
 });
 
-app.MapPost("/curve/subadditive-closure", ([FromBody]int f) =>
+app.MapPost("/curve/minimum", ([FromBody]string[] operands) =>
 {
-    var fCurve = map[f];
-    var result = fCurve.SubAdditiveClosure();
-    var id = result.GetHashCode();
-    map[id] = result;
-    return id;
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+    
+    var result = Curve.Minimum(curves);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/maximum", ([FromBody]string[] operands) =>
+{
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+    
+    var result = Curve.Maximum(curves);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/convolution", ([FromBody]string[] operands) =>
+{
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+    
+    var result = Curve.Convolution(curves);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/maxPlusConvolution", ([FromBody]string[] operands) =>
+{
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+    
+    var result = Curve.MaxPlusConvolution(curves);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/deconvolution", ([FromBody]string[] operands) =>
+{
+    if (operands.Length != 2)
+        return Results.BadRequest("Deconvolution accepts only 2 operands.");
+
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+
+    var result = Curve.Deconvolution(curves[0], curves[1]);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/maxPlusDeconvolution", ([FromBody]string[] operands) =>
+{
+    if (operands.Length != 2)
+        return Results.BadRequest("(max,+) deconvolution accepts only 2 operands.");
+
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+
+    var result = Curve.Deconvolution(curves[0], curves[1]);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/composition", ([FromBody]string[] operands) =>
+{
+    if (operands.Length != 2)
+        return Results.BadRequest("Composition accepts only 2 operands.");
+
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+
+    var result = Curve.Composition(curves[0], curves[1]);
+    var id = StoreCurve(result);
+    return Results.Ok(id);
+});
+
+app.MapPost("/curve/lowerPseudoInverse", ([FromBody]string curveId) =>
+{
+    var curve = LoadCurve(curveId);
+    if (curve == null)
+        return Results.NotFound(curveId);
+    
+    var result = curve.LowerPseudoInverse();
+    var resultId = StoreCurve(result);
+    return Results.Ok(resultId);
+});
+
+app.MapPost("/curve/upperPseudoInverse", ([FromBody]string curveId) =>
+{
+    var curve = LoadCurve(curveId);
+    if (curve == null)
+        return Results.NotFound(curveId);
+    
+    var result = curve.UpperPseudoInverse();
+    var resultId = StoreCurve(result);
+    return Results.Ok(resultId);
+});
+
+app.MapPost("/curve/subadditiveClosure", ([FromBody]string curveId) =>
+{
+    var curve = LoadCurve(curveId);
+    if (curve == null)
+        return Results.NotFound(curveId);
+    
+    var result = curve.SubAdditiveClosure();
+    var resultId = StoreCurve(result);
+    return Results.Ok(resultId);
 });
 
 app.Run();
-
-record ConvolutionOperands(int f, int g);
-record DeconvolutionOperands(int f, int g);
