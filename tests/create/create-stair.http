@@ -1,0 +1,8 @@
+POST http://localhost:1006/curve HTTP/1.1
+content-type: application/json
+
+{
+    "type": "stairCurve",
+    "a": 13,
+    "b": 2
+}

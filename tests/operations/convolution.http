@@ -1,0 +1,7 @@
+POST http://localhost:1006/curve/convolution HTTP/1.1
+content-type: application/json
+
+[
+    "883D5A67",
+    "BE1AF84F"
+]

@@ -1,0 +1,65 @@
+POST http://localhost:1006/curve HTTP/1.1
+content-type: application/json
+
+{
+    "type": "curve",
+    "baseSequence": 
+    {
+        "elements": [
+            {
+                "type": "point",
+                "time": 0,
+                "value": 0
+            },
+            {
+                "type": "segment",
+                "startTime": 0,
+                "endTime": {
+                    "num": 1,
+                    "den": 3
+                },
+                "rightLimitAtStartTime": 0,
+                "slope": 0
+            },
+            {
+                "type": "point",
+                "time": {
+                    "num": 1,
+                    "den": 3
+                },
+                "value": 0
+            },
+            {
+                "type": "segment",
+                "startTime": {
+                    "num": 1,
+                    "den": 3
+                },
+                "endTime": 3,
+                "rightLimitAtStartTime": 0,
+                "slope": 0
+            },
+            {
+                "type": "point",
+                "time": 3,
+                "value": 0
+            },
+            {
+                "type": "segment",
+                "startTime": 3,
+                "endTime": {
+                    "num": 10,
+                    "den": 3
+                },
+                "rightLimitAtStartTime": 0,
+                "slope": 12
+            }
+        ]
+    },
+    "pseudoPeriodStart": {
+        "num": 1,
+        "den": 3
+    },
+    "pseudoPeriodLength": 3,
+    "pseudoPeriodHeight": 4
+}
