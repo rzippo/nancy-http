@@ -76,7 +76,43 @@ app.MapGet("/curve/{id}/valueAt", (string id, [FromBody] Rational time) =>
     }
 });
 
-app.MapDelete("/curve", (int id) => map.Remove(id, out _));
+app.MapDelete("/curve/{id}", (string id) => map.Remove(IdToHash(id), out _));
+
+app.MapGet("/curve/{id}/rightLimitAt", (string id, [FromBody] Rational time) =>
+{
+    var curve = LoadCurve(id);
+    if (curve == null)
+        return Results.NotFound();
+    else
+    {
+        var sample = curve.RightLimitAt(time);
+        return Results.Ok(sample);
+    }
+});
+
+app.MapGet("/curve/{id}/leftLimitAt", (string id, [FromBody] Rational time) =>
+{
+    var curve = LoadCurve(id);
+    if (curve == null)
+        return Results.NotFound();
+    else
+    {
+        var sample = curve.LeftLimitAt(time);
+        return Results.Ok(sample);
+    }
+});
+
+app.MapGet("/curve/{id}/getCsharpCodeString", (string id) =>
+{
+    var curve = LoadCurve(id);
+    if (curve == null)
+        return Results.NotFound();
+    else
+    {
+        var codeString = curve.ToCodeString();
+        return Results.Ok(codeString);
+    }
+});
 
 app.MapPost("/curve/addition", ([FromBody]string[] operands) =>
 {
@@ -211,7 +247,7 @@ app.MapPost("/curve/upperPseudoInverse", ([FromBody]string curveId) =>
     return Results.Ok(resultId);
 });
 
-app.MapPost("/curve/subadditiveClosure", ([FromBody]string curveId) =>
+app.MapPost("/curve/subAdditiveClosure", ([FromBody]string curveId) =>
 {
     var curve = LoadCurve(curveId);
     if (curve == null)
@@ -220,6 +256,43 @@ app.MapPost("/curve/subadditiveClosure", ([FromBody]string curveId) =>
     var result = curve.SubAdditiveClosure();
     var resultId = StoreCurve(result);
     return Results.Ok(resultId);
+});
+
+app.MapPost("/curve/superAdditiveClosure", ([FromBody]string curveId) =>
+{
+    var curve = LoadCurve(curveId);
+    if (curve == null)
+        return Results.NotFound(curveId);
+    
+    var result = curve.SuperAdditiveClosure();
+    var resultId = StoreCurve(result);
+    return Results.Ok(resultId);
+});
+
+app.MapPost("/curve/horizontalDeviation", ([FromBody]string[] operands) =>
+{
+    if (operands.Length != 2)
+        return Results.BadRequest("Horizontal deviation accepts only 2 operands.");
+
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+
+    var result = Curve.HorizontalDeviation(curves[0], curves[1]);
+    return Results.Ok(result);
+});
+
+app.MapPost("/curve/verticalDeviation", ([FromBody]string[] operands) =>
+{
+    if (operands.Length != 2)
+        return Results.BadRequest("Vertical deviation accepts only 2 operands.");
+
+    var (curves, notFound) = LoadCurves(operands); 
+    if (notFound.Count > 0)
+        return Results.NotFound(notFound);
+
+    var result = Curve.VerticalDeviation(curves[0], curves[1]);
+    return Results.Ok(result);
 });
 
 app.Run();

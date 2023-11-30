@@ -1,4 +1,4 @@
-POST http://localhost:1006/curve/subadditiveClosure HTTP/1.1
+POST http://localhost:1006/curve/subAdditiveClosure HTTP/1.1
 content-type: application/json
 
 "883D5A67"
