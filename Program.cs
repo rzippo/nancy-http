@@ -64,7 +64,9 @@ app.MapGet("/curve/{id}", (string id) =>
         return Results.Ok(new { curve = curve });
 });
 
-app.MapGet("/curve/{id}/valueAt", (string id, [FromBody] Rational time) =>
+app.MapDelete("/curve/{id}", (string id) => map.Remove(IdToHash(id), out _));
+
+app.MapPost("/curve/{id}/valueAt", (string id, [FromBody] Rational time) =>
 {
     var curve = LoadCurve(id);
     if (curve == null)
@@ -76,9 +78,7 @@ app.MapGet("/curve/{id}/valueAt", (string id, [FromBody] Rational time) =>
     }
 });
 
-app.MapDelete("/curve/{id}", (string id) => map.Remove(IdToHash(id), out _));
-
-app.MapGet("/curve/{id}/rightLimitAt", (string id, [FromBody] Rational time) =>
+app.MapPost("/curve/{id}/rightLimitAt", (string id, [FromBody] Rational time) =>
 {
     var curve = LoadCurve(id);
     if (curve == null)
@@ -90,7 +90,7 @@ app.MapGet("/curve/{id}/rightLimitAt", (string id, [FromBody] Rational time) =>
     }
 });
 
-app.MapGet("/curve/{id}/leftLimitAt", (string id, [FromBody] Rational time) =>
+app.MapPost("/curve/{id}/leftLimitAt", (string id, [FromBody] Rational time) =>
 {
     var curve = LoadCurve(id);
     if (curve == null)
